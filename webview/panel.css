@@ -125,12 +125,15 @@ body {
 
 .xp .labels .level {
   text-transform: uppercase;
+  font-weight: 900;
 }
 
 .xp .labels #levelLabel {
-  font-size: 2.4em;
+  display: inline-block;
+  padding-left: 0.1em;
+  font-size: 1.6em;
   line-height: 1;
-  font-weight: 800;
+  font-weight: normal;
   font-family: 'GravityBold8', var(--vscode-font-family);
   background: linear-gradient(75deg, #ff8a00, #ff00e5);
   background-clip: text;
