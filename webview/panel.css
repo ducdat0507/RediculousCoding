@@ -1,3 +1,8 @@
+@font-face {
+  font-family: GravityBold8;
+  src: url(../media/font/GravityBold8.ttf);
+}
+
 :root {
   color-scheme: light dark;
   --fg: var(--vscode-editor-foreground);
@@ -10,96 +15,236 @@
 }
 
 body {
-  font: var(--vscode-font-family);
+  font-family: var(--vscode-font-family);
   color: var(--fg);
   background: var(--bg);
-  padding: 12px;
   line-height: 1.4;
 }
 
-.container { max-width: 720px; margin: 0 auto; }
-
-.header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.logo { width: 28px; height: 28px; opacity: 0.9; }
-.title h1 { font-size: 16px; margin: 0; }
-.subtitle { margin: 0; font-size: 12px; color: var(--muted); }
-
-.card { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
-.card-title { margin: 0 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-
-.toggles {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 12px;
+.container {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  padding: 12px;
+  margin: 0 auto;
 }
 
-.toggle-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 999px; border: 1px solid var(--card-border); background: color-mix(in oklab, var(--bg), #000 4%); cursor: pointer; font-size: 12px; }
-.toggle-pill:hover { border-color: color-mix(in oklab, var(--accent), transparent 60%); }
-.toggle-pill input { margin: 0; }
-.toggle-pill span { user-select: none; }
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.logo {
+  width: 28px;
+  height: 28px;
+  opacity: 0.9;
+}
+
+.title h1 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.toggles {
+  display: flex;
+  flex-flow: column;
+  gap: 8px;
+}
+
+.toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: color-mix(in oklab, var(--bg), #000 4%);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toggle-pill:hover {
+  border-color: color-mix(in oklab, var(--accent), transparent 60%);
+}
+
+.toggle-pill input {
+  margin: 0;
+}
+
+.toggle-pill span {
+  user-select: none;
+}
 
 .toggles input[type="checkbox"] {
   margin: 0;
 }
 
+.xp {
+  display: flex;
+  flex-flow: column;
+  justify-content: center;
+  margin-block: -12px 12px;
+  padding-block: 0 12px;
+  padding-inline: min(5%, 20px);
+  min-height: 121px;
+  box-sizing: border-box;
+  border-bottom: 1px dashed var(--card-border);
+}
+
 .xp .labels {
   display: flex;
   justify-content: space-between;
+  align-items: last baseline;
   margin: 6px 0 8px;
 }
 
-.badge { display: inline-flex; align-items: center; gap: 6px; background: color-mix(in oklab, var(--accent), transparent 75%); color: var(--accent); border: 1px solid color-mix(in oklab, var(--accent), transparent 70%); padding: 2px 8px; border-radius: 999px; font-size: 12px; }
-.muted { color: var(--muted); font-size: 12px; }
-
-.bar {
-  height: 12px;
-  background: color-mix(in oklab, var(--bar), #000 6%);
-  border-radius: 999px;
-  overflow: hidden;
-  position: relative;
+.xp .labels .level {
+  text-transform: uppercase;
 }
 
-.bar #barInner {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #ff8a00, #ff00e5);
-  transition: width 150ms linear;
+.xp .labels #levelLabel {
+  font-size: 2.4em;
+  line-height: 1;
+  font-weight: 800;
+  font-family: 'GravityBold8', var(--vscode-font-family);
+  background: linear-gradient(75deg, #ff8a00, #ff00e5);
+  background-clip: text;
+  color: transparent;
+}
+
+.xp .labels .xp-labels {
+  text-align: end;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.xp .labels #currentXPLabel {
+  font-weight: bold;
+}
+
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in oklab, var(--accent), transparent 75%);
+  color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent), transparent 70%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#xpBar {
+  --progress: 0;
+  height: 12px;
+  border-radius: 12px;
+  background: 
+    linear-gradient(color-mix(in oklab, var(--bg), color(from var(--bar) srgb r g b / 1) 10%) 0% 100%) 
+      right -1px top -1px
+      / calc(calc(100% + 2px) * calc(1 - var(--progress))) calc(100% + 2px)
+      no-repeat,
+    linear-gradient(90deg, #0082c7, #00a953, #f5ff49, #ff8a00, #ff0000);
+  outline: 1px solid var(--card-border);
+  overflow: hidden;
+  position: relative;
+  transition: background-position 150ms, background-size 150ms;
 }
 
 .row {
   margin-top: 8px;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .btn {
   background: var(--accent);
   color: var(--vscode-button-foreground);
+  font-family: var(--vscode-font-family); 
+  font-size: 12px;
   border: none;
   padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
+
 .btn:hover {
   background: var(--vscode-button-hoverBackground, var(--accent));
   opacity: 0.9;
 }
+
 .btn:active {
   opacity: 0.8;
 }
 
-.btn.ghost { background: transparent; border: 1px solid var(--card-border); color: var(--fg); }
-.btn.ghost:hover { background: color-mix(in oklab, var(--bg), #000 4%); }
-
-#soundNotice.notice { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--card-border); background: color-mix(in oklab, var(--bg), #000 3%); font-size: 12px; color: var(--muted); cursor: pointer; }
-
-#fwCanvas {
-  width: 100%;
-  height: 120px;
-  margin-top: 10px;
-  background: rgba(255,255,255,0.03);
-  border-radius: 6px;
+.btn.ghost {
+  background: transparent;
+  border: 1px solid var(--card-border);
+  color: var(--fg);
 }
 
-.hidden { display: none; }
+.btn.ghost:hover {
+  background: color-mix(in oklab, var(--bg), #000 4%);
+}
+
+#soundNotice {
+  position: absolute;
+  inset-inline: 12px;
+  top: 12px;
+  z-index: 1;
+}
+#soundNotice.notice {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px dashed var(--card-border);
+  background: color-mix(in oklab, var(--bg), #000 3%);
+  box-shadow: 0 0 6px 6px var(--bg);
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+#fwCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.hidden {
+  display: none;
+}

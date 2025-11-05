@@ -2,8 +2,8 @@
   "name": "ridiculous-coding",
   "displayName": "Ridiculous Coding",
   "description": "Make your coding experience 1000x more ridiculous in VS Code: blips, booms, fireworks, XP and levels. Inspired by the Godot Rediculous Coding plugin by jotson.",
-  "version": "0.0.2",
-  "publisher": "Merenut",
+  "version": "0.0.3",
+  "publisher": "duducat",
   "license": "MIT",
   "engines": {
     "vscode": "^1.84.0"
@@ -19,107 +19,188 @@
     "configuration": {
       "title": "Ridiculous Coding",
       "properties": {
-        "ridiculousCoding.explosions": {
+        "ridiculousCoding.blips.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Show 'boom' effects when deleting."
+          "description": "Show blue crosshair effects when character is inserted."
         },
-        "ridiculousCoding.blips": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show 'blip' effects when typing and newline animation."
-        },
-        "ridiculousCoding.chars": {
-          "type": "boolean",
-          "default": true,
-          "description": "Overlay the last key/character label with the effects."
-        },
-        "ridiculousCoding.shake": {
-          "type": "boolean",
-          "default": true,
-          "description": "Approximate editor 'shake' by jittering effect decorations."
-        },
-        "ridiculousCoding.shakeAmplitude": {
-          "type": "number",
-          "default": 6,
-          "minimum": 0,
-          "maximum": 32,
-          "description": "Shake amplitude in pixels (uniform in all directions)."
-        },
-        "ridiculousCoding.shakeDecayMs": {
-          "type": "number",
-          "default": 120,
-          "minimum": 20,
-          "maximum": 2000,
-          "description": "How long (ms) shake continues after the last keypress."
-        },
-        "ridiculousCoding.sound": {
-          "type": "boolean",
-          "default": true,
-          "description": "Play sounds for blips, booms, and fireworks from the panel."
-        },
-        "ridiculousCoding.fireworks": {
-          "type": "boolean",
-          "default": true,
-          "description": "Celebrate level-ups with fireworks in the panel."
-        },
-        "ridiculousCoding.leveling.baseXp": {
-          "type": "number",
-          "default": 50,
-          "minimum": 10,
-          "description": "Base XP used in the level-up curve (original plugin uses 50)."
-        },
-        "ridiculousCoding.enableStatusBar": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show XP/Level in the status bar."
-        },
-        "ridiculousCoding.reducedEffects": {
-          "type": "boolean",
-          "default": false,
-          "description": "Reduce visual and sound effects for accessibility. When enabled, disables most animations and sounds."
-        },
-        "ridiculousCoding.combo.maxTrail": {
-          "type": "number",
-          "default": 5,
-          "minimum": 0,
-          "description": "Maximum number of trailing decorations to keep per effect type."
-        },
-        "ridiculousCoding.combo.ttl.blipMs": {
-          "type": "number",
-          "default": 400,
-          "minimum": 0,
-          "description": "Lifetime (ms) of a blip trail decoration."
-        },
-        "ridiculousCoding.combo.ttl.boomMs": {
-          "type": "number",
-          "default": 650,
-          "minimum": 0,
-          "description": "Lifetime (ms) of a boom trail decoration."
-        },
-        "ridiculousCoding.combo.ttl.newlineMs": {
-          "type": "number",
-          "default": 350,
-          "minimum": 0,
-          "description": "Lifetime (ms) of a newline trail decoration."
-        },
-        "ridiculousCoding.combo.anim.frameMs": {
-          "type": "number",
-          "default": 50,
-          "minimum": 10,
-          "description": "Animation frame interval in milliseconds for trail updates."
-        },
-        "ridiculousCoding.combo.anim.floatEm": {
+        "ridiculousCoding.blips.volume": {
           "type": "number",
           "default": 0.7,
           "minimum": 0,
-          "description": "Additional vertical float distance (in em) over lifetime."
+          "maximum": 1,
+          "description": "Volume for a 'blip' sound effect."
         },
-        "ridiculousCoding.combo.anim.scaleAdd": {
+        "ridiculousCoding.blips.scale": {
           "type": "number",
-          "default": 0.6,
+          "default": 1,
           "minimum": 0,
-          "description": "Additional scale amount added over lifetime."
+          "description": "Scale for a 'blip' visual effect."
+        },
+        "ridiculousCoding.blips.duration": {
+          "type": "number",
+          "default": 400,
+          "minimum": 0,
+          "description": "Duration of a 'blip' visual effect in milliseconds."
+        },
+        "ridiculousCoding.blips.streakTimeout": {
+          "type": "number",
+          "default": 180,
+          "minimum": 0,
+          "description": "Maximum time between each keystroke for 'blip' sounds to increase in pitch."
+        },
+        "ridiculousCoding.booms.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show explosion effects when a character is deleted."
+        },
+        "ridiculousCoding.booms.volume": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Volume for a 'boom' sound effect."
+        },
+        "ridiculousCoding.booms.scale": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "description": "Scale for a 'boom' visual effect."
+        },
+        "ridiculousCoding.booms.duration": {
+          "type": "number",
+          "default": 650,
+          "minimum": 0,
+          "description": "Duration of a 'boom' visual effect in milliseconds."
+        },
+        "ridiculousCoding.slams.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable arrows when a line in inserted or deleted."
+        },
+        "ridiculousCoding.slams.volume": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Volume for a 'slam' sound effect."
+        },
+        "ridiculousCoding.slams.duration": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "description": "Duration of a 'slam' visual effect in milliseconds."
+        },
+        "ridiculousCoding.keys.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show key labels that pops up for each keystroke."
+        },
+        "ridiculousCoding.keys.maxCount": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "description": "The maximum number of key labels to appear at once."
+        },
+        "ridiculousCoding.keys.scaleBase": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "description": "Base scale for a key label effect."
+        },
+        "ridiculousCoding.keys.scaleAdd": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "description": "Additional scale for a key label effect to grow over its lifetime."
+        },
+        "ridiculousCoding.keys.floatDistance": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "description": "Distance for a key label effect to float up over its lifetime in ems."
+        },
+        "ridiculousCoding.keys.duration": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "description": "Duration of a key label effect in milliseconds."
+        },
+        "ridiculousCoding.shakes.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable editor shaking on every keystroke."
+        },
+        "ridiculousCoding.shakes.duration": {
+          "type": "number",
+          "default": 120,
+          "minimum": 0,
+          "description": "Duration to shake to last after a keystroke in milliseconds."
+        },
+        "ridiculousCoding.shakes.intensity": {
+          "type": "number",
+          "default": 4,
+          "minimum": 0,
+          "maximum": 32,
+          "description": "Intensity of the shaking in pixels."
+        },
+        "ridiculousCoding.fireworks.enabled": {
+          "type": "boolean",
+          "default": true,
+          "minimum": 0,
+          "description": "Enable fireworks effects upon a level up."
+        },
+        "ridiculousCoding.fireworks.volume": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Volume for a firework sound effect."
+        },
+        "ridiculousCoding.sounds.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable all sound effects."
+        },
+        "ridiculousCoding.sounds.volume": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Master volume for all sound effects."
+        },
+        "ridiculousCoding.reducedEffects.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Disable all visual effects."
+        },
+        "ridiculousCoding.general.maxDecorationCount": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "description": "The maximum number of visual effects to appear at once."
+        },
+        "ridiculousCoding.general.updateRate": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 0,
+          "description": "Target update rate to update visual effects in milliseconds."
+        },
+        "ridiculousCoding.general.xpScale": {
+          "type": "number",
+          "default": 50,
+          "minimum": 0,
+          "description": "Base scaling of XP requirements."
+        },
+        "ridiculousCoding.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show current level and XP progress on the status bar."
+        },
+        "ridiculousCoding.statusBar.template": {
+          "type": "string",
+          "default": "$(rocket) Lv.{level} — {currentXP} / {targetXP} XP",
+          "description": "The template string to be applied on the status bar. Aceepted variables are `{level}`, `{currentXP}`, and `{targetXP}`"
         }
       }
     },

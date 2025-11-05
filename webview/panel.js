@@ -2,16 +2,19 @@
   const vscode = acquireVsCodeApi();
 
   const els = {
-    explosions: document.getElementById("explosions"),
-    blips: document.getElementById("blips"),
-    chars: document.getElementById("chars"),
-    shake: document.getElementById("shake"),
-    sound: document.getElementById("sound"),
-    fireworks: document.getElementById("fireworks"),
-    reducedEffects: document.getElementById("reducedEffects"),
+    toggles: {
+      booms: document.getElementById("explosions"),
+      blips: document.getElementById("blips"),
+      keys: document.getElementById("chars"),
+      shakes: document.getElementById("shake"),
+      sounds: document.getElementById("sound"),
+      fireworks: document.getElementById("fireworks"),
+      reducedEffects: document.getElementById("reducedEffects"),
+    },
     levelLabel: document.getElementById("levelLabel"),
-    xpLabel: document.getElementById("xpLabel"),
-    barInner: document.getElementById("barInner"),
+    currentXPLabel: document.getElementById("currentXPLabel"),
+    targetXPLabel: document.getElementById("targetXPLabel"),
+    xpBar: document.getElementById("xpBar"),
     resetBtn: document.getElementById("resetBtn"),
     testFireworks: document.getElementById("testFireworks"),
     fwCanvas: document.getElementById("fwCanvas")
@@ -22,6 +25,8 @@
   let actx = null;
   const buffers = { blip: null, boom: null, fireworks: null };
   let audioUnlocked = false;
+  let lastAudioPlayTime = 0;
+  let lastAudioKind = "";
   async function fetchArrayBuffer(url) {
     const res = await fetch(url);
     return await res.arrayBuffer();
@@ -49,19 +54,23 @@
   function playWav(kind, opts = {}) {
     try {
       if (!audioUnlocked || !buffers[kind]) return;
+      let now = Date.now();
+      if (now - lastAudioPlayTime < 33 && kind == lastAudioKind) return;
+      lastAudioKind = kind;
+      lastAudioPlayTime = now;
       if (actx && actx.state === 'suspended') {
         actx.resume().catch(() => {});
       }
       const src = actx.createBufferSource();
       src.buffer = buffers[kind];
-      if (opts.playbackRate && typeof opts.playbackRate === 'number') {
-        src.playbackRate.value = Math.max(0.5, Math.min(3.0, opts.playbackRate));
-      }
+      src.playbackRate.value = Math.max(0.5, Math.min(3.0, opts.playbackRate ?? 1));
       const gain = actx.createGain();
-      gain.gain.value = 0.5;
+      gain.gain.value = opts.volume ?? 0.5;
       src.connect(gain).connect(actx.destination);
       src.start();
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   // Fireworks particles on canvas
@@ -74,19 +83,21 @@
       canvas.width = canvas.clientWidth * window.devicePixelRatio;
       canvas.height = canvas.clientHeight * window.devicePixelRatio;
       this.particles = [];
-      for (let i = 0; i < 80; i++) {
+      for (let i = 0; i < 200; i++) {
+        let velocity = (Math.random() ** 3 + Math.random() * 0.5) * 8 * window.devicePixelRatio;
+        let angle = Math.random() * Math.PI * 2;
         this.particles.push({
           x: canvas.width / 2,
-          y: canvas.height - 10,
-          vx: (Math.random() - 0.5) * 6,
-          vy: -Math.random() * 8 - 4,
-          life: 60 + Math.random() * 30,
+          y: canvas.height + 10,
+          vx: velocity * Math.sin(angle),
+          vy: velocity * Math.cos(angle) - 5,
+          life: 120 + Math.random() * 240,
           color: `hsl(${Math.random() * 360}, 90%, 60%)`
         });
       }
       this.running = true;
       this.loop();
-      setTimeout(() => this.stop(), 1500);
+      setTimeout(() => this.stop(), 10000);
     },
     stop() {
       this.running = false;
@@ -97,39 +108,45 @@
       const ctx = els.fwCanvas.getContext("2d");
       ctx.clearRect(0, 0, els.fwCanvas.width, els.fwCanvas.height);
       this.particles.forEach(p => {
-        p.vy += 0.15;
+        p.vy += 0.10 * window.devicePixelRatio;
         p.x += p.vx;
+        if (p.x < 0) {
+          p.x = -p.x;
+          p.vx = Math.max(0, -p.vx) * 0.75;
+        } else if (p.x > els.fwCanvas.width) {
+          p.x = els.fwCanvas.width * 2 - p.x;
+          p.vx = Math.min(0, -p.vx) * 0.75;
+        }
         p.y += p.vy;
         p.life -= 1;
+        ctx.globalAlpha = Math.min(1, p.life / 60);
         ctx.fillStyle = p.color;
         ctx.fillRect(p.x, p.y, 3, 3);
       });
-      this.particles = this.particles.filter(p => p.life > 0 && p.y < els.fwCanvas.height);
+      this.particles = this.particles.filter(p => p.life > 0 && p.y < els.fwCanvas.height + 30);
       requestAnimationFrame(() => this.loop());
     }
   };
 
   // Wire toggles
-  ["explosions", "blips", "chars", "shake", "sound", "fireworks", "reducedEffects"].forEach(key => {
-    els[key].addEventListener("change", () => {
-      vscode.postMessage({ type: "toggle", key, value: els[key].checked });
+  for (const toggle in els.toggles) {
+    els.toggles[toggle].addEventListener("change", (e) => {
+      vscode.postMessage({ type: "toggle", key: toggle, value: e.target.checked });
     });
-  });
+  }
 
-  els.resetBtn.addEventListener("click", () => vscode.postMessage({ type: "resetXp" }));
-  els.testFireworks.addEventListener("click", () => {
-    // Play sound if enabled (same as real fireworks)
-    if (els.sound.checked) playBeep(0.5);
-    fw.start();
+  els.resetBtn.addEventListener("click", () => {
+    vscode.postMessage({ type: "resetXp" })
   });
 
   function setState({ xp, level, xpNext, xpLevelStart = 0 }) {
     const current = xp - xpLevelStart;
     const max = xpNext - xpLevelStart;
-    els.levelLabel.textContent = `Level: ${level}`;
-    els.xpLabel.textContent = `XP: ${xp} / ${xpNext}`;
-    const pct = Math.max(0, Math.min(100, (current / Math.max(1, max)) * 100));
-    els.barInner.style.width = `${pct}%`;
+    els.levelLabel.textContent = level.toLocaleString("en-US");
+    els.currentXPLabel.textContent = xp.toLocaleString("en-US");
+    els.targetXPLabel.textContent = xpNext.toLocaleString("en-US");
+    const pct = Math.max(0, Math.min(1, (current / Math.max(1, max))));
+    els.xpBar.style.setProperty("--progress", pct);
   }
 
   window.addEventListener("message", e => {
@@ -137,30 +154,35 @@
     switch (msg.type) {
       case "init":
         // Settings
-        els.explosions.checked = msg.settings.explosions;
-        els.blips.checked = msg.settings.blips;
-        els.chars.checked = msg.settings.chars;
-        els.shake.checked = msg.settings.shake;
-        els.sound.checked = msg.settings.sound;
-        els.fireworks.checked = msg.settings.fireworks;
-        els.reducedEffects.checked = msg.settings.reducedEffects;
-  preloadSounds({ blip: msg.soundUris.blip, boom: msg.soundUris.boom, fireworks: msg.soundUris.fireworks });
-  // Unlock audio on first interaction
-  document.addEventListener('click', unlockAudio, { once: true });
-  document.addEventListener('keydown', unlockAudio, { once: true });
+        preloadSounds({ 
+          blip: msg.soundUris.blip, 
+          boom: msg.soundUris.boom, 
+          fireworks: msg.soundUris.fireworks
+        });
+        // Unlock audio on first interaction
+        document.addEventListener('click', unlockAudio, { once: true });
+        document.addEventListener('keydown', unlockAudio, { once: true });
         setState(msg);
-        break;
+        // Jump to next case
+      case "settings":
+        els.toggles.booms.checked = msg.settings.booms.enabled;
+        els.toggles.blips.checked = msg.settings.blips.enabled;
+        els.toggles.keys.checked = msg.settings.keys.enabled;
+        els.toggles.shakes.checked = msg.settings.shakes.enabled;
+        els.toggles.sounds.checked = msg.settings.sounds.enabled;
+        els.toggles.fireworks.checked = msg.settings.fireworks.enabled;
+        els.toggles.reducedEffects.checked = msg.settings.reducedEffects.enabled;
       case "state":
         setState(msg);
         break;
       case "blip":
-        if (msg.enabled) playWav('blip', { playbackRate: msg.pitch ?? 1.0 });
+        playWav('blip', { volume: msg.volume, playbackRate: msg.pitch ?? 1.0 });
         break;
       case "boom":
-        if (msg.enabled) playWav('boom');
+        playWav('boom', { volume: msg.volume });
         break;
       case "fireworks":
-        if (msg.enabled) playWav('fireworks');
+        playWav('fireworks', { volume: msg.volume });
         fw.start();
         break;
     }

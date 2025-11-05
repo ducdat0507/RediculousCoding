@@ -1,14 +1,20 @@
 import * as vscode from "vscode";
 import { PanelMessageFromExt, PanelMessageToExt, Settings } from "../types";
+import { XPService } from "../services/XPService";
+import { SettingProp, SettingsService } from "../services/SettingService";
 
 export class PanelViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "ridiculousCoding.panel";
 
   private _view?: vscode.WebviewView;
   private context: vscode.ExtensionContext;
+  private xp: XPService;
+  private settings: SettingsService;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext, xp: XPService, settings: SettingsService) {
     this.context = context;
+    this.xp = xp;
+    this.settings = settings;
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void | Thenable<void> {
@@ -32,16 +38,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
           };
           this.post({
             type: "init",
-            settings: this.getSettings(),
-            xp: this.context.globalState.get("xp", 0),
-            level: this.context.globalState.get("level", 1),
-            xpNext: this.context.globalState.get("xpNextAbs", 100),
-            xpLevelStart: this.context.globalState.get("xpLevelStart", 0),
+            settings: this.settings.data,
+            xp: this.xp.xp,
+            level: this.xp.level,
+            xpNext: this.xp.xpToNextLevel,
+            xpLevelStart: this.xp.xpStartOfLevel,
             soundUris
           });
           break;
         case "toggle":
-          this.updateSetting(msg.key, msg.value);
+          this.updateSetting(msg.key + ".enabled", msg.value);
           break;
         case "resetXp":
           vscode.commands.executeCommand("ridiculousCoding.resetXp");
@@ -49,10 +55,16 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
         case "requestState":
           this.post({
             type: "state",
-            xp: this.context.globalState.get("xp", 0),
-            level: this.context.globalState.get("level", 1),
-            xpNext: this.context.globalState.get("xpNextAbs", 100),
-            xpLevelStart: this.context.globalState.get("xpLevelStart", 0)
+            xp: this.xp.xp,
+            level: this.xp.level,
+            xpNext: this.xp.xpToNextLevel,
+            xpLevelStart: this.xp.xpStartOfLevel
+          });
+          break;
+        case "requestSettings":
+          this.post({
+            type: "settings",
+            settings: this.settings.data
           });
           break;
       }
@@ -67,40 +79,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
     this._view?.show?.(true);
   }
 
-  private getSettings(): Settings {
-    const cfg = vscode.workspace.getConfiguration("ridiculousCoding");
-    return {
-      explosions: cfg.get("explosions", true),
-      blips: cfg.get("blips", true),
-      chars: cfg.get("chars", true),
-      shake: cfg.get("shake", true),
-      shakeAmplitude: cfg.get("shakeAmplitude", 6),
-      shakeDecayMs: cfg.get("shakeDecayMs", 120),
-      sound: cfg.get("sound", true),
-      fireworks: cfg.get("fireworks", true),
-      baseXp: cfg.get("leveling.baseXp", 50),
-      enableStatusBar: cfg.get("enableStatusBar", true),
-      reducedEffects: cfg.get("reducedEffects", false)
-    };
-  }
-
-  private async updateSetting<K extends keyof Settings>(key: K, value: Settings[K]) {
-    const map: Record<string, string> = {
-      explosions: "explosions",
-      blips: "blips",
-      chars: "chars",
-      shake: "shake",
-      shakeAmplitude: "shakeAmplitude",
-      shakeDecayMs: "shakeDecayMs",
-      sound: "sound",
-      fireworks: "fireworks",
-      baseXp: "leveling.baseXp",
-      enableStatusBar: "enableStatusBar",
-      reducedEffects: "reducedEffects"
-    };
-    const configKey = map[key];
-    if (!configKey) return;
-    await vscode.workspace.getConfiguration("ridiculousCoding").update(configKey, value, true);
+  private async updateSetting<T>(key: string, value: T) {
+    let prop: any = this.settings.props;
+    for (let p of key.split(".")) prop = prop[p];
+    (prop as SettingProp<T>).value = value;
+    this.settings.persist();
   }
 
   private getHtml(webview: vscode.Webview): string {
@@ -125,18 +108,26 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
 <title>Ridiculous Coding</title>
 </head>
 <body>
+  <div class="notice" id="soundNotice" role="button" tabindex="0" title="Click to enable sound">Click here to enable sound</div>
   <div class="container">
-    <header class="header">
-      <img class="logo" src="${logoUri}" alt="Ridiculous Coding" />
-      <div class="title">
-        <h1>Ridiculous Coding</h1>
-        <p class="subtitle">Blips, booms, fireworks, XP and levels ✨</p>
+  
+    <section class="xp">
+      <div class="labels">
+        <div class="level">
+          Level
+          <span id="levelLabel">0</span>
+        </div>
+        <div class="xp-labels">
+          <span id="currentXPLabel">0</span><br>/
+          <span id="targetXPLabel">0</span> XP
+        </div>
       </div>
-    </header>
+      <div id="xpBar"></div>
+      <canvas id="fwCanvas" class="hidden"></canvas>
+    </section>
 
     <section class="card">
       <h2 class="card-title">Effects</h2>
-      <div class="notice" id="soundNotice" role="button" tabindex="0" title="Click to enable sound">🔊 Click anywhere in this panel to enable sound</div>
       <div class="toggles">
         <label class="toggle-pill"><input id="explosions" type="checkbox"><span>Explosions</span></label>
         <label class="toggle-pill"><input id="blips" type="checkbox"><span>Blips</span></label>
@@ -148,18 +139,11 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
       </div>
     </section>
 
-    <section class="card xp">
-      <h2 class="card-title">Progress</h2>
-      <div class="labels">
-        <div id="levelLabel" class="badge">Level: 1</div>
-        <div id="xpLabel" class="muted">XP: 0 / 100</div>
-      </div>
-      <div class="bar"><div id="barInner"></div></div>
+    <section class="card">
+      <h2 class="card-title">Other</h2>
       <div class="row">
-        <button id="resetBtn" class="btn">Reset</button>
-        <button id="testFireworks" class="btn ghost" title="Test fireworks">🎆 Test Fireworks</button>
+        <button id="resetBtn" class="btn">Reset XP</button>
       </div>
-      <canvas id="fwCanvas" class="hidden"></canvas>
     </section>
   </div>
 

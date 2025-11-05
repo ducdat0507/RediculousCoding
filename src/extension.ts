@@ -1,28 +1,17 @@
 import * as vscode from "vscode";
 import { EffectManager } from "./effects/EffectManager";
-import { XPService } from "./xp/XPService";
+import { XPService } from "./services/XPService";
 import { PanelViewProvider } from "./view/PanelViewProvider";
 import { PanelMessageFromExt, Settings } from "./types";
+import { SettingProp, SettingsService } from "./services/SettingService";
 
 export function activate(context: vscode.ExtensionContext) {
-  const cfg = vscode.workspace.getConfiguration("ridiculousCoding");
-  let settings: Settings = {
-    explosions: cfg.get("explosions", true),
-    blips: cfg.get("blips", true),
-    chars: cfg.get("chars", true),
-    shake: cfg.get("shake", true),
-    shakeAmplitude: cfg.get("shakeAmplitude", 6),
-    shakeDecayMs: cfg.get("shakeDecayMs", 120),
-    sound: cfg.get("sound", true),
-    fireworks: cfg.get("fireworks", true),
-    baseXp: cfg.get("leveling.baseXp", 50),
-    enableStatusBar: cfg.get("enableStatusBar", true),
-    reducedEffects: cfg.get("reducedEffects", false)
-  };
+  const settings = new SettingsService();
+  const instanceID = Math.random().toString().substring(2);
 
-  const xp = new XPService(context, settings.baseXp);
-  const effects = new EffectManager(context);
-  const panelProvider = new PanelViewProvider(context);
+  const xp = new XPService(context, settings.data.general.xpScale);
+  const effects = new EffectManager(context, settings);
+  const panelProvider = new PanelViewProvider(context, xp, settings);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(PanelViewProvider.viewType, panelProvider)
   );
@@ -33,14 +22,25 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(status);
 
   function updateStatus() {
-    if (!settings.enableStatusBar) {
+    if (!settings.data.statusBar.enabled) {
       status.hide();
-      return;
+    } else {
+      const prog = xp.progress;
+      const templates: Record<string, string> = {
+        level: xp.level.toString(),
+        currentXP: prog.current.toLocaleString("en-US"),
+        targetXP: prog.max.toLocaleString("en-US")
+      }
+      function applyTemplates(text: string) {
+        for (let template in templates) {
+          text = text.replace(`{${template}}`, templates[template]);
+        }
+        return text;
+      }
+      status.text = applyTemplates(settings.data.statusBar.template);
+      status.tooltip = applyTemplates(`Ridiculous Coding\nLevel {level} — {currentXP} / {targetXP} XP`);
+      status.show();
     }
-    const prog = xp.progress;
-    status.text = `$(rocket) RC Lv ${xp.level} — ${prog.current}/${prog.max} XP`;
-    status.tooltip = `Ridiculous Coding\nLevel ${xp.level}\n${prog.current}/${prog.max} XP`;
-    status.show();
   }
   updateStatus();
   // One-time panel reveal to help unlock audio on first sound attempt
@@ -53,83 +53,44 @@ export function activate(context: vscode.ExtensionContext) {
       xp.reset();
       pushState();
       updateStatus();
-      if (settings.fireworks) {
-        post({ type: "fireworks", enabled: settings.sound });
-      }
     }),
-    vscode.commands.registerCommand("ridiculousCoding.toggleExplosions", () => toggle("explosions")),
-    vscode.commands.registerCommand("ridiculousCoding.toggleBlips", () => toggle("blips")),
-    vscode.commands.registerCommand("ridiculousCoding.toggleChars", () => toggle("chars")),
-    vscode.commands.registerCommand("ridiculousCoding.toggleShake", () => toggle("shake")),
-    vscode.commands.registerCommand("ridiculousCoding.toggleSound", () => toggle("sound")),
-    vscode.commands.registerCommand("ridiculousCoding.toggleFireworks", () => toggle("fireworks")),
-    vscode.commands.registerCommand("ridiculousCoding.toggleReducedEffects", () => toggle("reducedEffects"))
+    vscode.commands.registerCommand("ridiculousCoding.toggleExplosions", () => toggle("booms.enabled")),
+    vscode.commands.registerCommand("ridiculousCoding.toggleBlips", () => toggle("blips.enabled")),
+    vscode.commands.registerCommand("ridiculousCoding.toggleChars", () => toggle("keys.enabled")),
+    vscode.commands.registerCommand("ridiculousCoding.toggleShake", () => toggle("shakes.enabled")),
+    vscode.commands.registerCommand("ridiculousCoding.toggleSound", () => toggle("sounds.enabled")),
+    vscode.commands.registerCommand("ridiculousCoding.toggleFireworks", () => toggle("fireworks.enabled")),
+    vscode.commands.registerCommand("ridiculousCoding.toggleReducedEffects", () => toggle("reducedEffects.enabled"))
   );
 
-  function toggle<K extends keyof Settings>(key: K) {
-    const map: Record<string, string> = {
-      explosions: "explosions",
-      blips: "blips",
-      chars: "chars",
-      shake: "shake",
-      sound: "sound",
-      fireworks: "fireworks",
-      baseXp: "leveling.baseXp",
-      enableStatusBar: "enableStatusBar",
-      reducedEffects: "reducedEffects"
-    };
-    const configKey = map[key];
-    if (!configKey) return;
-    const cfg = vscode.workspace.getConfiguration("ridiculousCoding");
-    const newVal = !(settings[key] as any as boolean);
-    cfg.update(configKey, newVal, true);
+  function toggle(key: string) {
+    let prop: any = settings.props;
+    for (let p of key.split(".")) prop = prop[p];
+    (prop as SettingProp<boolean>).value = !(prop as SettingProp<boolean>).value;
+    settings.persist();
   }
 
   // React to configuration changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(e => {
       if (!e.affectsConfiguration("ridiculousCoding")) return;
-      const cfg = vscode.workspace.getConfiguration("ridiculousCoding");
-      const oldReducedEffects = settings.reducedEffects;
-      settings = {
-        explosions: cfg.get("explosions", true),
-        blips: cfg.get("blips", true),
-        chars: cfg.get("chars", true),
-        shake: cfg.get("shake", true),
-        shakeAmplitude: cfg.get("shakeAmplitude", 6),
-        shakeDecayMs: cfg.get("shakeDecayMs", 120),
-        sound: cfg.get("sound", true),
-        fireworks: cfg.get("fireworks", true),
-        baseXp: cfg.get("leveling.baseXp", 50),
-        enableStatusBar: cfg.get("enableStatusBar", true),
-        reducedEffects: cfg.get("reducedEffects", false)
-      };
-      
-      // If reduced effects was just enabled, clear all decorations
-      if (!oldReducedEffects && settings.reducedEffects) {
+      settings.refresh();
+    
+      if (settings.props.reducedEffects.enabled) {
         vscode.window.visibleTextEditors.forEach(editor => {
           effects.clearAllDecorations(editor);
         });
       }
       
-      xp.setBaseXp(settings.baseXp);
+      xp.setBaseXp(settings.data.general.xpScale);
       pushState();
       updateStatus();
-      // Update panel state (init is sent by PanelViewProvider and includes sound URIs)
-      post({
-        type: "state",
-        xp: xp.xp,
-        level: xp.level,
-        xpNext: xp.xpNextAbs,
-        xpLevelStart: xp.xpStartOfLevel
-      });
     })
   );
 
   // Pitch increase that resets shortly after typing stops
   let pitchIncrease = 0;
   let pitchResetTimer: NodeJS.Timeout | undefined;
-  const PITCH_RESET_MS = 180; // reset a short time after typing stops
 
   // Event handling: typing, deleting, newline
   let lastLineByEditor = new WeakMap<vscode.TextEditor, number>();
@@ -142,67 +103,80 @@ export function activate(context: vscode.ExtensionContext) {
       const change = evt.contentChanges[0];
       if (!change) return;
 
+      console.log(evt);
+
       // Classify
       const insertedText = change.text ?? "";
       const removedChars = change.rangeLength ?? 0;
       const isInsert = insertedText.length > 0;
+      const isNewLine = isInsert && "\r\n".includes(insertedText[0]);
       const isDelete = !isInsert && removedChars > 0;
 
       const caret = editor.selection.active;
       // Character label from inserted text (first char) or delete symbol
       const charLabel =
-        isInsert && settings.chars
+        !settings.data.keys.enabled || isNewLine
+          ? undefined
+        : isInsert
           ? sanitizeLabel(insertedText[0] ?? "")
-          : isDelete && settings.chars
+        : isDelete
           ? "BACKSPACE"
-          : undefined;
+        : undefined;
 
-      if (isInsert && settings.blips && !settings.reducedEffects) {
-        if (settings.sound && !revealedForSound) {
-          revealedForSound = true;
-          panelProvider.reveal();
+      if (!settings.data.reducedEffects.enabled) {
+
+        if (isNewLine) {
+          effects.showNewline(editor, settings.data.shakes.enabled);
+          if (settings.data.sounds.enabled) {
+            post({ 
+              type: "boom", 
+              volume: settings.data.booms.volume * settings.data.sounds.volume,
+            });
+          }
+        } else if (isInsert) {
+          if (settings.data.sounds.enabled) {
+            if (!revealedForSound) {
+              revealedForSound = true;
+              panelProvider.reveal();
+            }
+
+            pitchIncrease += 1.0;
+            if (pitchResetTimer) clearTimeout(pitchResetTimer);
+            pitchResetTimer = setTimeout(() => { pitchIncrease = 0; }, settings.data.blips.streakTimeout);
+            const pitch = 1.0 + Math.min(20, pitchIncrease) * 0.05;
+            post({ 
+              type: "blip", 
+              volume: settings.data.blips.volume * settings.data.sounds.volume,
+              pitch,
+            });
+          }
+
+          effects.showBlip(editor, settings.data.keys.enabled, settings.data.shakes.enabled, charLabel);
+        } else if (isDelete) {
+          if (settings.data.sounds.enabled) {
+            post({ 
+              type: "boom", 
+              volume: settings.data.booms.volume * settings.data.sounds.volume,
+            });
+          }
+
+          effects.showBoom(editor, settings.data.keys.enabled, settings.data.shakes.enabled, charLabel);
         }
-        effects.showBlip(editor, settings.chars, settings.shake, charLabel);
-        pitchIncrease += 1.0;
-        if (pitchResetTimer) clearTimeout(pitchResetTimer);
-        pitchResetTimer = setTimeout(() => { pitchIncrease = 0; }, PITCH_RESET_MS);
-        // Sound via panel (disabled in reduced effects mode)
-        const pitch = 1.0 + Math.min(20, pitchIncrease) * 0.05; // cap growth
-        post({ type: "blip", pitch, enabled: settings.sound && !settings.reducedEffects });
-        // XP (always gained, even in reduced effects)
-        const leveled = xp.addXp(1);
-        if (leveled && settings.fireworks && !settings.reducedEffects) post({ type: "fireworks", enabled: settings.sound && !settings.reducedEffects });
-        pushState();
-        updateStatus();
-      } else if (isInsert) {
-        // Still gain XP even in reduced effects mode
-        const leveled = xp.addXp(1);
-        pushState();
-        updateStatus();
-      } else if (isDelete && settings.explosions && !settings.reducedEffects) {
-        effects.showBoom(editor, settings.chars, settings.shake, charLabel);
-        post({ type: "boom", enabled: settings.sound && !settings.reducedEffects });
-        pushState();
       }
 
-      // Newline detection within this change (also disabled in reduced effects)
-      if (settings.blips && insertedText.includes("\n") && !settings.reducedEffects) {
-        effects.showNewline(editor, settings.shake);
+      // Update XP
+      if (isInsert) {
+        const leveled = xp.addXp(1);
+        if (leveled && settings.data.fireworks.enabled && !settings.data.reducedEffects.enabled) {
+          post({ type: "fireworks" });
+        }
+        pushState();
+        updateStatus();
       }
 
       // Track line change between events for additional newline cues
       lastLineByEditor.set(editor, caret.line);
     }),
-
-    vscode.window.onDidChangeTextEditorSelection(e => {
-      const editor = e.textEditor;
-      const last = lastLineByEditor.get(editor);
-      const now = editor.selection.active.line;
-      if (last !== undefined && now !== last && settings.blips && !settings.reducedEffects) {
-        effects.showNewline(editor, settings.shake);
-      }
-      lastLineByEditor.set(editor, now);
-    })
   );
 
   function sanitizeLabel(ch: string): string {
@@ -217,7 +191,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   function pushState() {
-    post({ type: "state", xp: xp.xp, level: xp.level, xpNext: xp.xpNextAbs, xpLevelStart: xp.xpStartOfLevel });
+    post({ type: "state", xp: xp.xp, level: xp.level, xpNext: xp.xpToNextLevel, xpLevelStart: xp.xpStartOfLevel });
   }
 
   // Initial state is sent by PanelViewProvider when webview is ready
